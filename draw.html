@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>h5 demo</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--<meta content="yes" name="apple-mobile-web-app-capable">-->
+    <script type="text/javascript" src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="http://apps.bdimg.com/libs/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+    <!--<link rel="stylesheet" href="css/bootstrap.css">-->
+    <link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <style>
+        .p-tools{
+            display: flex;
+            flex-direction: row;
+        }
+        .radio-btn{
+            display: inline-block;
+        }
+        .radio-btn input{
+            height:1px;
+            width:1px;
+            overflow: hidden;
+            margin: -1px;
+        }
+    </style>
+    <script src="layer.mobile-v2.0/layer_mobile/layer.js"></script>
+</head>
+
+<body oncontextmenu="return false;" onselectstart="return false;">
+    <div style="overflow: auto;">
+        <canvas id='canvas' style="border:2px solid #000;margin:2px"></canvas>
+    </div>
+    <div class="p-tools btn-group">
+        <label class="radio-btn btn btn-default"><input name="drawTools" type="radio" id="tool_pen"/>画图</label>
+        <label class="radio-btn btn btn-default"><input name="drawTools" type="radio" id="tool_text"/>文字</label>
+        <div id="undo" class="btn btn-danger">撤销</div>
+        <div id="redo" class="btn btn-success">取消撤销</div>
+    </div>
+    <script>
+
+;(function($){
+    $.fn.drawManager = function(options){
+        var opts = $.extend({}, {
+            imageUrl: null,//编辑图片路径
+            tools: [], // 操作按钮
+            callback: function(){}
+        }, options);
+        /**
+         * 准备数据
+         */
+        var canvas = $(this),canvasDOM = canvas[0];
+        var ctx = canvasDOM.getContext('2d');
+        var handleImg = new Image();// 要被编辑的图片
+        var touchFlag = false, drawFlag = false, handleFlag = 1;
+        var history = new Array(), cStep = -1, initState; // undo redo
+        var endX, endY, x, y;
+        var fontTip = $("<textarea rows='3' cols='20' style='background:transparent;position:absolute;display:none;'></textarea>");
+
+        canvas.parent().css('height',getViewportSize().height-$('.p-tools').height());
+        handleImg.src = opts.imageUrl;
+        canvasDOM.height = 500;
+        canvasDOM.width = 1000;//getWidth() - 20;
+        ctx.lineWidth = 3.0; // 设置线宽
+        ctx.strokeStyle = "#fc1741"; // 设置线的颜色
+
+        /**
+         * 载入图片
+         */
+        handleImg.onload = function(){
+            ctx.drawImage(handleImg, 0, 0); // 左距 上距  宽  高
+            initState = canvasDOM.toDataURL();
+        };
+        /**
+         * 注册事件
+         */
+        canvasDOM.addEventListener('mousemove', onMouseMove, false);
+        canvasDOM.addEventListener('mousedown', onMouseDown, false);
+        canvasDOM.addEventListener('mouseup', onMouseUp, false);
+
+        $('#undo').on('click',function(){
+            undo();
+        });
+        $('#redo').on('click',function(){
+            redo();
+        });
+
+//        $('#isDraw').on('click',function(){
+//            drawFlag = $(this).prop('checked')? true: false;
+//            if($(this).prop('checked')){
+        canvasDOM.addEventListener('touchstart',onMouseDown,false);
+        canvasDOM.addEventListener('touchmove',onMouseMove,false);
+        canvasDOM.addEventListener('touchend',onMouseUp,false);
+//            }else{
+//                canvasDOM.removeEventListener('touchstart',onMouseDown,false);
+//                canvasDOM.removeEventListener('touchmove',onMouseMove,false);
+//                canvasDOM.removeEventListener('touchend',onMouseUp,false);
+//            }
+//        });
+        /**
+         * 绑定工具
+         */
+        $('[name=drawTools]').change(function(){
+            var self = $(this);
+            var val = self.val(),type = self.prop('id');
+            if('on' == val){
+                switch (type){
+                    case 'tool_pen': { handleFlag = 1; break;}
+                    case 'tool_text': { handleFlag = 2; break;}
+                    default: { handleFlag = 1;}
+                }
+            }
+        });
+
+        /**
+        * 获取屏幕宽度
+        * @returns {*}
+        */
+        function getWidth(){
+            var xWidth = null;
+            if (window.innerWidth !== null) {
+                xWidth = window.innerWidth;
+            } else {
+                xWidth = document.body.clientWidth;
+            }
+            return xWidth;
+        }
+
+        /**
+         * touchStart
+         * @param evt
+         */
+        function onMouseDown(evt){
+            var p = pos(evt);
+            touchFlag = drawFlag ? true : false;
+            switch (handleFlag){
+                case 1: {
+                    evt.preventDefault();
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    break;
+                }
+                case 2: { break; }
+            }
+        }
+
+        /**
+         * touchEnd
+         * @param evt
+         */
+        function onMouseUp(evt){
+            evt.preventDefault();
+            historyPush();
+            touchFlag = false;
+        }
+
+        /**
+         * touchMove
+         * @param evt
+         */
+        function onMouseMove(evt){
+            evt.preventDefault();
+            switch (handleFlag){
+                case 1: { drawPen(evt);}
+                case 2: { moveWord(evt)}
+            }
+        }
+        
+        function historyPush() {
+            cStep++;
+            if(cStep < history.length){
+                history.length = cStep; // 这步作用
+            }
+
+            history[history.length] = canvasDOM.toDataURL(); //为当前状态生成快照
+        }
+        
+        function undo() {
+            if(cStep>=0){
+                clearCanvas();
+                cStep--;
+                var tempImage = new Image();
+                tempImage.src = history[cStep] || initState;
+                tempImage.onload = function(){
+                    ctx.drawImage(tempImage,0,0);
+                }
+            }
+        }
+
+        function redo(){
+            if(cStep < history.length - 1){
+                clearCanvas();
+                cStep++;
+                var tempImage = new Image();
+                tempImage.src = history[cStep];
+                tempImage.onload = function(){
+                    ctx.drawImage(tempImage,0,0);
+                }
+            }
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle="#FFFFFF";
+            var width  = canvas.attr("width");
+            var height  = canvas.attr("height");
+            ctx.fillRect(0,0,width,height);
+        }
+
+        function fakeWordsInput(e) {
+            var offset = canvas.offset();
+            endX= e.pageX-offset.left;
+            endY  = e.pageY-offset.top;
+            if(true){
+                fontTip.show();
+                fontTip.css({left:x,top:y});
+                fontTip.width(endX-x);
+                fontTip.height(endY-y);
+            }
+        }
+
+        function drawPen(e){
+            var p = pos(e);
+            ctx.lineTo(p.x, p.y);
+            ctx.lineWidth = 3.0; // 设置线宽
+            ctx.shadowColor = "#fc1741";
+            ctx.shadowBlur = 1;
+            ctx.stroke();
+        }
+
+        /**
+         * 获取鼠标在画布的位置
+         * @param event
+         * @returns {{x: *, y: *}}
+         */
+        function pos(event){
+            var x,y;
+            //偏移量
+            var poi =canvas.position(), offsetX = poi.left,
+                offsetY = poi.top;
+            if(isTouch(event)){
+                x = event.touches[0].pageX;
+                y = event.touches[0].pageY;
+            }else{
+                x = event.layerX;
+                y = event.layerY;
+            }
+            return {x: x - offsetX,y: y - offsetY};
+        }
+
+        function isTouch(event){
+            var type = event.type;
+            if(type.indexOf('touch')>=0){
+                return true;
+            }else{
+                return false;
+            }
+        }
+
+        function getViewportSize () {
+            return {
+                width: window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth,
+                height: window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight
+            };
+        }
+    }
+})(jQuery);
+
+$("#canvas").drawManager({
+    imageUrl:'img/testCad.jpg'
+});
+    </script>
+</body>
+</html>

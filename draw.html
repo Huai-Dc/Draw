@@ -8,6 +8,7 @@
     <!--<meta content="yes" name="apple-mobile-web-app-capable">-->
     <!--<link rel="stylesheet" href="css/bootstrap.css">-->
     <link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="font-awesome-4.7.0/css/font-awesome.min.css">
     <style>
         .p-tools{
             display: flex;
@@ -22,20 +23,30 @@
             overflow: hidden;
             margin: -1px;
         }
+        .p-active{
+            background-color: #149bdf !important;
+            color: #fff !important;
+        }
     </style>
     <script src="layer.mobile-v2.0/layer_mobile/layer.js"></script>
     <script src="js/bootstrap.min.js"></script>
+
 </head>
 
 <body oncontextmenu="return false;" onselectstart="return false;">
     <div style="overflow: auto;">
         <canvas id='canvas' style="border:2px solid #000;margin:2px"></canvas>
     </div>
+    <textarea rows='3' cols='20' style='background:transparent;position:absolute;display:none;'></textarea>
     <div class="p-tools btn-group">
-        <label class="radio-btn btn btn-default"><input name="drawTools" type="radio" id="tool_pen"/>画图</label>
-        <label class="radio-btn btn btn-default"><input name="drawTools" type="radio" id="tool_text"/>文字</label>
-        <div id="undo" class="btn btn-danger">撤销</div>
-        <div id="redo" class="btn btn-success">取消撤销</div>
+        <label class="radio-btn btn btn-default p-active"><input name="drawTools" type="radio" id="tool_hand"><i class="fa fa-hand-paper-o"></i></label>
+        <label class="radio-btn btn btn-default"><input name="drawTools" type="radio" id="tool_pen"/><i class="fa fa-pencil"></i></label>
+        <label class="radio-btn btn btn-default"><input name="drawTools" type="radio" id="tool_text"/><i class="fa fa-font"></i></label>
+        <div id="undo" class="btn btn-danger"><i class="fa fa-mail-reply"></i></div>
+        <div id="redo" class="btn btn-success"><i class="fa fa-mail-forward"></i></div>
+    </div>
+    <div>
+
     </div>
     <script>
 
@@ -52,7 +63,7 @@
         var canvas = $(this),canvasDOM = canvas[0];
         var ctx = canvasDOM.getContext('2d');
         var handleImg = new Image();// 要被编辑的图片
-        var touchFlag = false, drawFlag = false, handleFlag = 1;
+        var touchFlag = false, handleFlag = 0;
         var history = new Array(), cStep = -1, initState; // undo redo
         var endX, endY, x, y;
         var fontTip = $("<textarea rows='3' cols='20' style='background:transparent;position:absolute;display:none;'></textarea>");
@@ -60,7 +71,7 @@
         canvas.parent().css('height',getViewportSize().height-$('.p-tools').height());
         handleImg.src = opts.imageUrl;
         canvasDOM.height = 500;
-        canvasDOM.width = 1000;//getWidth() - 20;
+        canvasDOM.width = 1000; //getWidth() - 20;
         ctx.lineWidth = 3.0; // 设置线宽
         ctx.strokeStyle = "#fc1741"; // 设置线的颜色
 
@@ -85,18 +96,10 @@
             redo();
         });
 
-//        $('#isDraw').on('click',function(){
-//            drawFlag = $(this).prop('checked')? true: false;
-//            if($(this).prop('checked')){
         canvasDOM.addEventListener('touchstart',onMouseDown,false);
         canvasDOM.addEventListener('touchmove',onMouseMove,false);
         canvasDOM.addEventListener('touchend',onMouseUp,false);
-//            }else{
-//                canvasDOM.removeEventListener('touchstart',onMouseDown,false);
-//                canvasDOM.removeEventListener('touchmove',onMouseMove,false);
-//                canvasDOM.removeEventListener('touchend',onMouseUp,false);
-//            }
-//        });
+
         /**
          * 绑定工具
          */
@@ -105,10 +108,13 @@
             var val = self.val(),type = self.prop('id');
             if('on' == val){
                 switch (type){
+                    case 'tool_hand': { handleFlag = 0; break;}
                     case 'tool_pen': { handleFlag = 1; break;}
                     case 'tool_text': { handleFlag = 2; break;}
-                    default: { handleFlag = 1;}
+                    default: { handleFlag = 0;}
                 }
+                $('.p-active').removeClass('p-active');
+                self.closest('.btn').addClass('p-active');
             }
         });
 
@@ -131,10 +137,11 @@
          * @param evt
          */
         function onMouseDown(evt){
-            var p = pos(evt);
-            touchFlag = drawFlag ? true : false;
+            touchFlag = true;
             switch (handleFlag){
+                case 0: { break; }
                 case 1: {
+                    var p = pos(evt);
                     evt.preventDefault();
                     ctx.beginPath();
                     ctx.moveTo(p.x, p.y);
@@ -149,8 +156,10 @@
          * @param evt
          */
         function onMouseUp(evt){
-            evt.preventDefault();
-            historyPush();
+            if(handleFlag !== 0){
+                evt.preventDefault();
+                historyPush();
+            }
             touchFlag = false;
         }
 
@@ -159,10 +168,10 @@
          * @param evt
          */
         function onMouseMove(evt){
-            evt.preventDefault();
             switch (handleFlag){
-                case 1: { drawPen(evt);}
-                case 2: { moveWord(evt)}
+                case 0: { break; }
+                case 1: { evt.preventDefault(); drawPen(evt);}
+                //case 2: { moveWord(evt)}
             }
         }
         
@@ -174,7 +183,9 @@
 
             history[history.length] = canvasDOM.toDataURL(); //为当前状态生成快照
         }
-        
+        /**
+         * 撤销
+         */
         function undo() {
             if(cStep>=0){
                 clearCanvas();
@@ -186,7 +197,9 @@
                 }
             }
         }
-
+        /**
+         * 取消撤销
+         */
         function redo(){
             if(cStep < history.length - 1){
                 clearCanvas();
@@ -217,8 +230,12 @@
                 fontTip.height(endY-y);
             }
         }
-
+        /**
+         * 画笔功能
+         */
         function drawPen(e){
+            console.log(touchFlag)
+            if(!touchFlag) return false;
             var p = pos(e);
             ctx.lineTo(p.x, p.y);
             ctx.lineWidth = 3.0; // 设置线宽

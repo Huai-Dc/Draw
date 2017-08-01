@@ -27,17 +27,32 @@
             background-color: #149bdf !important;
             color: #fff !important;
         }
+        .ball {
+            position: absolute;
+            line-height: 2.75rem;
+            width: 2.75rem;
+            height: 2.75rem;
+            padding: .5rem;
+            text-align: center;
+            border-radius: 99px;
+            color: #fff;
+            /*border: 1rem solid transparent;*/
+            background-color: #ed424b;
+            background-clip: padding-box;
+            text-decoration: none;
+        }
     </style>
     <script src="layer.mobile-v2.0/layer_mobile/layer.js"></script>
     <script src="js/bootstrap.min.js"></script>
+    <script src="js/dragEle.js"></script>
 
 </head>
 
 <body oncontextmenu="return false;" onselectstart="return false;">
-    <div style="overflow: auto;">
+    <div style="overflow: auto;" id="p-draw-content">
         <canvas id='canvas' style="border:2px solid #000;margin:2px"></canvas>
     </div>
-    <textarea rows='3' cols='20' style='background:transparent;position:absolute;display:none;'></textarea>
+
     <div class="p-tools btn-group">
         <label class="radio-btn btn btn-default p-active"><input name="drawTools" type="radio" id="tool_hand"><i class="fa fa-hand-paper-o"></i></label>
         <label class="radio-btn btn btn-default"><input name="drawTools" type="radio" id="tool_pen"/><i class="fa fa-pencil"></i></label>
@@ -45,11 +60,7 @@
         <div id="undo" class="btn btn-danger"><i class="fa fa-mail-reply"></i></div>
         <div id="redo" class="btn btn-success"><i class="fa fa-mail-forward"></i></div>
     </div>
-    <div>
-
-    </div>
     <script>
-
 ;(function($){
     $.fn.drawManager = function(options){
         var opts = $.extend({}, {
@@ -60,13 +71,14 @@
         /**
          * 准备数据
          */
-        var canvas = $(this),canvasDOM = canvas[0];
+        var canvas = $(this), canvasDOM = canvas[0], drawCon = $('#p-draw-content');
         var ctx = canvasDOM.getContext('2d');
         var handleImg = new Image();// 要被编辑的图片
         var touchFlag = false, handleFlag = 0;
         var history = new Array(), cStep = -1, initState; // undo redo
         var endX, endY, x, y;
-        var fontTip = $("<textarea rows='3' cols='20' style='background:transparent;position:absolute;display:none;'></textarea>");
+        var fontTip = $('<div class="clearfix" style="display:none;transform: translate3d(100px,-200px,0px);position:absolute;" id="p-draw-wordCon"><i class="fa fa-arrows"></i> <textarea style="background:transparent;position:absolute;width:150px;"></textarea></div>');
+        drawCon.append(fontTip);
 
         canvas.parent().css('height',getViewportSize().height-$('.p-tools').height());
         handleImg.src = opts.imageUrl;
@@ -75,6 +87,35 @@
         ctx.lineWidth = 3.0; // 设置线宽
         ctx.strokeStyle = "#fc1741"; // 设置线的颜色
 
+        var win = window;
+
+        // 浏览器窗体尺寸
+        var winWidth = win.innerWidth;
+        var winHeight = win.innerHeight;
+
+        // 设置transform坐标等方法
+        var fnTranslate = function (ele, x, y) {
+            x = Math.round(1000 * x) / 1000;
+            y = Math.round(1000 * y) / 1000;
+
+            ele.style.webkitTransform = 'translate(' + [x + 'px', y + 'px'].join(',') + ')';
+            ele.style.transform = 'translate3d(' + [x + 'px', y + 'px', 0].join(',') + ')';
+        };
+
+        var data = {
+            distanceX: 0,
+            distanceY: 0
+        };
+
+        fontTip.find('.fa-arrows')[0].addEventListener('touchstart',function (event) {
+            var event = event.touches[0] || event;
+            data.posX = event.pageX;
+            data.posY = event.pageY;
+            data.touching = true;
+            console.log(this);
+            data.bound = this.parentNode.getBoundingClientRect();
+            console.log(data);
+        });
         /**
          * 载入图片
          */
@@ -107,10 +148,11 @@
             var self = $(this);
             var val = self.val(),type = self.prop('id');
             if('on' == val){
+                fontTip.hide();
                 switch (type){
                     case 'tool_hand': { handleFlag = 0; break;}
                     case 'tool_pen': { handleFlag = 1; break;}
-                    case 'tool_text': { handleFlag = 2; break;}
+                    case 'tool_text': { handleFlag = 2; fontTip.show(); break;}
                     default: { handleFlag = 0;}
                 }
                 $('.p-active').removeClass('p-active');
@@ -136,13 +178,13 @@
          * touchStart
          * @param evt
          */
-        function onMouseDown(evt){
+        function onMouseDown(event){
             touchFlag = true;
             switch (handleFlag){
                 case 0: { break; }
                 case 1: {
-                    var p = pos(evt);
-                    evt.preventDefault();
+                    var p = pos(event);
+                    event.preventDefault();
                     ctx.beginPath();
                     ctx.moveTo(p.x, p.y);
                     break;
@@ -155,9 +197,9 @@
          * touchEnd
          * @param evt
          */
-        function onMouseUp(evt){
+        function onMouseUp(event){
             if(handleFlag !== 0){
-                evt.preventDefault();
+                event.preventDefault();
                 historyPush();
             }
             touchFlag = false;
@@ -167,11 +209,12 @@
          * touchMove
          * @param evt
          */
-        function onMouseMove(evt){
+        function onMouseMove(event){
             switch (handleFlag){
                 case 0: { break; }
-                case 1: { evt.preventDefault(); drawPen(evt);}
-                //case 2: { moveWord(evt)}
+                case 1: { event.preventDefault(); drawPen(event);}
+                case 2: { break; }
+                default: { break; }
             }
         }
         
@@ -218,6 +261,12 @@
             var height  = canvas.attr("height");
             ctx.fillRect(0,0,width,height);
         }
+        /**
+         * 初始化文字输入框
+         */
+        function initWordInput(){
+
+        }
 
         function fakeWordsInput(e) {
             var offset = canvas.offset();
@@ -234,7 +283,6 @@
          * 画笔功能
          */
         function drawPen(e){
-            console.log(touchFlag)
             if(!touchFlag) return false;
             var p = pos(e);
             ctx.lineTo(p.x, p.y);
@@ -264,6 +312,11 @@
             return {x: x - offsetX,y: y - offsetY};
         }
 
+        /**
+         * 判断是否是触摸事件
+         * @param event
+         * @returns {boolean}
+         */
         function isTouch(event){
             var type = event.type;
             if(type.indexOf('touch')>=0){

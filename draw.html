@@ -106,15 +106,33 @@
             distanceX: 0,
             distanceY: 0
         };
+        var moveIcon = fontTip.find('.fa-arrows')[0],
+            moveCon = fontTip;
 
-        fontTip.find('.fa-arrows')[0].addEventListener('touchstart',function (event) {
+        moveIcon.addEventListener('touchstart',function (event) {
             var event = event.touches[0] || event;
             data.posX = event.pageX;
             data.posY = event.pageY;
             data.touching = true;
-            console.log(this);
             data.bound = this.parentNode.getBoundingClientRect();
-            console.log(data);
+        });
+
+        document.addEventListener('touchmove',function(event){
+            if (data.touching !== true) {
+                return;
+            }
+            event.preventDefault();
+            var e = event.touches[0] || event;
+
+            data.nowX = e.pageX;
+            data.nowY = e.pageY;
+
+            var distanceX = data.nowX - data.posX,
+                distanceY = data.nowY - data.posY;
+            var x = data.distanceX + distanceX, y = data.distanceY + distanceY;
+            fnTranslate(fontTip[0], x, y);
+            fontTip[0].distanceX = x;
+            fontTip[0].distanceY = y;
         });
         /**
          * 载入图片

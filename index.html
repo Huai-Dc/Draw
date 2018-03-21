@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <script src="http://apps.bdimg.com/libs/jquery/1.7.2/jquery.min.js"></script>
+    <script src='http://api.map.baidu.com/getscript?v=2.0&ak=v4ryKM9FjT361YkVCXL59Wy7&services=&t=20150707171040'></script>
+    <script type="text/javascript" src="http://api.map.baidu.com/library/DrawingManager/1.4/src/DrawingManager_min.js"></script>
+    <link rel="stylesheet" href="http://api.map.baidu.com/library/DrawingManager/1.4/src/DrawingManager_min.css" />
+    <script src="./baiduMap.js"></script>
+    <style>
+        #mapCanvas .BMapLib_Drawing_panel{
+            height: 80px;
+            border: 1px solid #666;
+            border-radius: 5px;
+            overflow: hidden;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+            float: left;
+        }
+    </style>
+</head>
+<body>
+    <div id="mapCanvas" style="width: 1000px;;height: 500px;"></div>
+    <script>
+    var mp = $("#mapCanvas").baidumap();
+    mp.drawingManager([BMAP_DRAWING_CIRCLE,     // 画圆工具
+                BMAP_DRAWING_POLYGON,    // 多边形工具
+                BMAP_DRAWING_RECTANGLE  // 矩形工具]
+                ]);
+    mp.drawFinish(function(e,overlay){
+        this.drawingManager.close();
+        console.log(e,overlay);
+        console.log(this.overlayStore)
+    });
+    //mp.getBoundary("西安",{strokeColor:"#ff0000"})
+    mp.getBoundary("西安",{fillColor:'#fff'})
+    var data = [
+            { lng: "113.74314", lat: "23.035941", id: "3074", name: "田禾卢浮公馆" ,offset:[]}
+            , { lng: "113.998936", lat: "22.91485", id: "2399", name: "风度盛荟", offset: [] }
+            , { lng: "113.703636", lat: "23.052705", id: "5001", name: "信鸿澜岸", offset: [] }
+            , { lng: "114.42966", lat: "22.75292", id: "5001", name: "德州城", offset: [] }
+            , { lng: "114.084118", lat: "22.822882", id: "5001", name: "银湖山庄", offset: [] }
+            , { lng: "114.100337", lat: "22.794628", id: "5001", name: "广基自由星城", offset: [] }
+            , { lng: "114.087258", lat: "22.755578", id: "5001", name: "珠江观澜御景", offset: [] }
+            , { lng: "114.052619", lat: "22.779788", id: "5001", name: "观岭高尔夫半山", offset: [] }
+            , { lng: "114.029425", lat: "22.785132", id: "5001", name: "万科棠樾", offset: [-155,-15,"right"] }
+        ];
+    mp.addSeaPoint(data,function(e){
+        console.log(e)
+    })
+    </script>
+</body>
+</html>
